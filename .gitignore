@@ -1,0 +1,17 @@
+node_modules
+dist
+dev-dist
+coverage
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+# Firebase emulator / CLI
+*-debug.log
+.firebase
+firebase-export-*
+# Playwright
+test-results
+playwright-report
+blob-report
+.DS_Store

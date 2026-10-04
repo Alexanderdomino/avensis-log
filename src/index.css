@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+/* Dark mode is class-based so the user can override the OS setting in Settings. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-good: #0ca30c;
+  --color-warn: #fab219;
+  --color-crit: #d03b3b;
+  --color-series: #2a78d6;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  --surface: #f6f7f9;
+  --card: #ffffff;
+  --ink: #0b0f14;
+  --ink-2: #4b5563;
+  --line: #e5e7eb;
+  --series: #2a78d6;
+  --grid: #e5e7eb;
+}
+.dark {
+  color-scheme: dark;
+  --surface: #0b0f14;
+  --card: #151b23;
+  --ink: #f3f4f6;
+  --ink-2: #a3acb9;
+  --line: #262f3a;
+  --series: #3987e5;
+  --grid: #262f3a;
+}
+
+html,
+body {
+  background: var(--surface);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  overscroll-behavior-y: none;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px; /* prevents iOS zoom on focus */
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
