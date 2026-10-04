@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { logTrip, mockWeather, nav, signIn, uidFor, writeDoc } from './helpers'
+import { logTrip, mockWeather, nav, setEmulatorRules, signIn, uidFor, writeDoc } from './helpers'
 
 test('log a trip and a fuel event, edit the trip, see both in history and insights', async ({ page }) => {
   const weather = await mockWeather(page)
@@ -215,4 +215,27 @@ test('export CSV with trips and events', async ({ page }) => {
   expect(trip.weather_status).toBe('ok')
   expect(event.event_label).toBe('Olie efterfyldt')
   expect(event.liters).toBe('0.5')
+})
+
+test('shows a helpful error instead of an endless spinner when Firestore denies access', async ({ page }) => {
+  await mockWeather(page)
+  // A fresh production-mode database: deny everything until firestore.rules is deployed.
+  await setEmulatorRules("rules_version = '2';\nservice cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write: if false; } } }")
+  try {
+    await page.goto('/')
+    await page.getByLabel('Testbruger e-mail').fill(`denied-${Date.now()}@example.com`)
+    await page.getByRole('button', { name: 'Log ind (emulator)' }).click()
+    const alert = page.getByRole('alert')
+    await expect(alert).toContainText('Kan ikke hente data')
+    await expect(alert).toContainText('firebase deploy --only firestore:rules')
+    await expect(alert).toContainText('permission-denied')
+    await expect(page.getByText('Indlæser…')).toHaveCount(0)
+
+    // Once the real rules are in place, "Prøv igen" recovers.
+    await setEmulatorRules(readFileSync('firestore.rules', 'utf8'))
+    await page.getByRole('button', { name: 'Prøv igen' }).click()
+    await expect(page.getByRole('heading', { name: 'Ny tur' })).toBeVisible()
+  } finally {
+    await setEmulatorRules(readFileSync('firestore.rules', 'utf8'))
+  }
 })
