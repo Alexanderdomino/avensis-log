@@ -1,0 +1,105 @@
+rules_version = '2';
+
+// Single-user car log. Every document lives under users/{uid}/… and only that signed-in user
+// may read or write it. Writes are validated so a buggy client can't store nonsense.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function optNumber(d, key, min, max) {
+      return !(key in d) || d[key] == null || (d[key] is number && d[key] >= min && d[key] <= max);
+    }
+
+    function optString(d, key, maxLen) {
+      return !(key in d) || (d[key] is string && d[key].size() <= maxLen);
+    }
+
+    function validLocation(loc) {
+      return loc == null || (
+        loc is map
+        && loc.keys().hasOnly(['lat', 'lon', 'source'])
+        && loc.lat is number && loc.lat >= -90 && loc.lat <= 90
+        && loc.lon is number && loc.lon >= -180 && loc.lon <= 180
+        && loc.source in ['gps', 'home']
+      );
+    }
+
+    function validWeather(w) {
+      return w == null || (
+        w is map
+        && w.keys().hasOnly(['temperature', 'humidity', 'dewPoint', 'dewPointSpread', 'precipitation',
+                             'weatherCode', 'pressure', 'precip12h', 'minTemp12h', 'source'])
+        && w.temperature is number && w.humidity is number && w.dewPoint is number
+        && w.dewPointSpread is number && w.precipitation is number && w.weatherCode is number
+        && w.pressure is number && w.precip12h is number && w.minTemp12h is number
+        && w.source in ['forecast', 'archive']
+      );
+    }
+
+    function validTrip(d) {
+      return d.keys().hasAll(['timestamp', 'rating', 'engine', 'tripType', 'weatherStatus'])
+        && d.keys().hasOnly(['timestamp', 'rating', 'severity', 'situations', 'engine', 'tripType', 'odometer',
+                             'notes', 'location', 'weatherStatus', 'weather', 'createdAt', 'updatedAt'])
+        && d.timestamp is timestamp
+        && d.rating in ['good', 'hesitates', 'no_power']
+        && (!('severity' in d) || d.severity == null || d.severity in [1, 2, 3])
+        && (!('situations' in d) || (d.situations is list && d.situations.size() <= 5
+              && d.situations.toSet().difference(['acceleration', 'uphill', 'steady', 'idle', 'cold_start'].toSet()).size() == 0))
+        && d.engine in ['cold', 'warm']
+        && d.tripType in ['city', 'country', 'motorway']
+        && optNumber(d, 'odometer', 0, 9999999)
+        && optString(d, 'notes', 2000)
+        && (!('location' in d) || validLocation(d.location))
+        && d.weatherStatus in ['ok', 'pending']
+        && (!('weather' in d) || validWeather(d.weather));
+    }
+
+    function validEvent(d) {
+      return d.keys().hasAll(['timestamp', 'type'])
+        && d.keys().hasOnly(['timestamp', 'type', 'odometer', 'liters', 'fuelBrand', 'octane', 'notes',
+                             'createdAt', 'updatedAt'])
+        && d.timestamp is timestamp
+        && d.type is string && d.type.size() > 0 && d.type.size() <= 64
+        && optNumber(d, 'odometer', 0, 9999999)
+        && optNumber(d, 'liters', 0, 100)
+        && optNumber(d, 'octane', 0, 120)
+        && optString(d, 'fuelBrand', 100)
+        && optString(d, 'notes', 2000);
+    }
+
+    function validSettings(d) {
+      return d.keys().hasOnly(['eventTypes', 'homeLocation', 'warmEngineHours', 'beforeAfterWindow',
+                               'minSampleSize', 'updatedAt'])
+        && (!('eventTypes' in d) || (d.eventTypes is list && d.eventTypes.size() <= 50))
+        && (!('homeLocation' in d) || d.homeLocation == null || (
+              d.homeLocation is map && d.homeLocation.keys().hasOnly(['lat', 'lon'])
+              && d.homeLocation.lat is number && d.homeLocation.lat >= -90 && d.homeLocation.lat <= 90
+              && d.homeLocation.lon is number && d.homeLocation.lon >= -180 && d.homeLocation.lon <= 180))
+        && optNumber(d, 'warmEngineHours', 0, 48)
+        && (!('beforeAfterWindow' in d) || (d.beforeAfterWindow is int && d.beforeAfterWindow >= 1 && d.beforeAfterWindow <= 100))
+        && (!('minSampleSize' in d) || (d.minSampleSize is int && d.minSampleSize >= 1 && d.minSampleSize <= 100));
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      match /trips/{tripId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validTrip(request.resource.data);
+      }
+
+      match /events/{eventId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validEvent(request.resource.data);
+      }
+
+      match /settings/{docId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validSettings(request.resource.data);
+      }
+    }
+  }
+}
