@@ -104,3 +104,13 @@ export async function writeDoc(path: string, data: Record<string, unknown>) {
   })
   if (!res.ok) throw new Error(await res.text())
 }
+
+/** Replace the Firestore emulator's security rules at runtime. */
+export async function setEmulatorRules(rules: string) {
+  const res = await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${PROJECT}:securityRules`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rules: { files: [{ name: 'firestore.rules', content: rules }] } }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+}

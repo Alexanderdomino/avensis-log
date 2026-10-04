@@ -25,6 +25,38 @@ export default function App() {
   )
 }
 
+/** A Firestore listener failed. Shown instead of an endless spinner, with what to do about it. */
+function DataErrorScreen({ code, message }: { code: string; message: string }) {
+  const { user, signOut } = useAuth()
+  const denied = code === 'permission-denied'
+  return (
+    <div className="space-y-4 pt-[max(env(safe-area-inset-top),1.5rem)]" role="alert">
+      <h1 className="text-2xl font-bold">Kan ikke hente data</h1>
+      {denied ? (
+        <div className="space-y-3 text-sm">
+          <p>Firestore afviste adgangen. Det betyder næsten altid, at sikkerhedsreglerne fra repoet (firestore.rules) ikke er udrullet til dette Firebase-projekt endnu – en ny database starter med regler, der afviser alt.</p>
+          <p>Udrul reglerne fra repoet:</p>
+          <pre className="overflow-x-auto rounded-xl bg-[var(--card)] p-3 text-xs">npx firebase use --add{'\n'}npx firebase deploy --only firestore:rules</pre>
+          <p>Tjek også, at projektet i VITE_FIREBASE_PROJECT_ID er det samme, som du udrullede til, og at databasen hedder “(default)”.</p>
+        </div>
+      ) : (
+        <p className="text-sm">Der opstod en fejl ved hentning af data.</p>
+      )}
+      <p className="break-all text-xs text-[var(--ink-2)]">
+        {code}: {message}
+        <br />
+        Bruger: {user?.email} ({user?.uid})
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <Button onClick={() => location.reload()}>Prøv igen</Button>
+        <Button variant="secondary" onClick={() => void signOut()}>
+          Log ud
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function Splash() {
   return <div className="flex min-h-dvh items-center justify-center text-[var(--ink-2)]">Indlæser…</div>
 }
@@ -68,8 +100,9 @@ function Shell() {
   return (
     <div className="mx-auto min-h-dvh max-w-xl">
       <main className="px-4 pb-28">
-        {error && <p className="mt-3 rounded-xl border border-crit p-3 text-sm text-crit">Datafejl: {error}</p>}
-        {loading ? (
+        {error ? (
+          <DataErrorScreen code={error.code} message={error.message} />
+        ) : loading ? (
           <Splash />
         ) : (
           <Routes>

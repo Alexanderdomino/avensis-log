@@ -240,3 +240,21 @@ Open the site in Safari (iOS) or Chrome (Android) → Share/menu → **Add to Ho
 the service worker, so the log screen opens and saves trips offline.
 
 Sign-in uses a Google popup, with an automatic fallback to a redirect if the popup is blocked.
+
+## Troubleshooting
+
+**"Kan ikke hente data" / `permission-denied` right after signing in.** Firestore is refusing the reads, which almost
+always means the rules from this repo were never deployed. A database created in production mode starts with rules
+that deny everything. Fix:
+
+```bash
+npx firebase use --add                        # select the project in VITE_FIREBASE_PROJECT_ID
+npx firebase deploy --only firestore:rules
+```
+
+Then tap "Prøv igen". If it still fails, check in the Firebase console → Firestore → Rules that the deployed rules
+contain `match /users/{uid}`. Also check that the app's `VITE_FIREBASE_PROJECT_ID` (in Vercel) is the same project you
+deployed to, and that the database is the `(default)` one.
+
+**`auth/unauthorized-domain` when signing in.** Add the Vercel domain under Authentication → Settings → Authorized
+domains (see step 4 above).

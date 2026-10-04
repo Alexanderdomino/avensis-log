@@ -4,13 +4,19 @@ import type { CarEvent, Settings, Trip } from '../lib/types'
 import { backfillPendingWeather, fetchWeather, needsWeather, type BackfillResult } from '../lib/weather'
 import { subscribeEvents, subscribeSettings, subscribeTrips, updateTrip } from './repo'
 
+export interface DataError {
+  code: string
+  message: string
+}
+
 interface DataState {
   uid: string
   trips: Trip[]
   events: CarEvent[]
   settings: Settings
   loading: boolean
-  error: string | null
+  /** Set when a Firestore listener fails (e.g. permission-denied); the data can't be trusted then. */
+  error: DataError | null
   pendingWeather: number
   backfilling: boolean
   /** Fetch weather for all pending trips. */
@@ -24,11 +30,11 @@ export function DataProvider({ uid, children }: { uid: string; children: ReactNo
   const [events, setEvents] = useState<CarEvent[]>([])
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState({ trips: false, events: false, settings: false })
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<DataError | null>(null)
   const [backfilling, setBackfilling] = useState(false)
 
   useEffect(() => {
-    const onError = (e: Error) => setError(e.message)
+    const onError = (e: Error) => setError({ code: (e as { code?: string }).code ?? 'unknown', message: e.message })
     const unsubs = [
       subscribeTrips(uid, (t) => (setTrips(t), setLoaded((l) => ({ ...l, trips: true }))), onError),
       subscribeEvents(uid, (e) => (setEvents(e), setLoaded((l) => ({ ...l, events: true }))), onError),
